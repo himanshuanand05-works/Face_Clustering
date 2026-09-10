@@ -51,6 +51,7 @@ class FaceClusteringCLI {
     const freshDescriptors = [];
     const fileMapping = [];
     let skipped = 0;
+    let noFaceImages = 0;
 
     for (const { fullPath } of imageFiles) {
       const hash = await this.hashFile(fullPath);
@@ -61,6 +62,7 @@ class FaceClusteringCLI {
       }
 
       const descriptors = await detector.getFaceDescriptors(fullPath);
+      if (descriptors.length === 0) noFaceImages += 1;
       descriptors.forEach(desc => {
         freshDescriptors.push(desc);
         fileMapping.push(fullPath);
@@ -70,9 +72,12 @@ class FaceClusteringCLI {
     }
 
     if (skipped > 0) console.log(`Skipped ${skipped} already-scanned image(s)`);
+    if (noFaceImages > 0) console.log(`Contained no faces: ${noFaceImages} image(s) (skipped, marked scanned)`);
     console.log(`Loaded ${freshDescriptors.length} new face descriptor(s)`);
 
     const groups = [];
+    let matchedFaceCount = 0;
+    let newPersonCount = 0;
 
     if (freshDescriptors.length === 0) {
       console.log('Nothing new to process.');
@@ -82,11 +87,13 @@ class FaceClusteringCLI {
       for (const cluster of clusters) {
         const person = store.createPerson(cluster.descriptors);
         groups.push({ personId: person.id, indices: cluster.indices });
+        newPersonCount += 1;
         console.log(`  Learned new person ${person.id} (${cluster.indices.length} face(s))`);
       }
       for (const item of noise) {
         const person = store.createPerson([item.descriptor]);
         groups.push({ personId: person.id, indices: [item.index] });
+        newPersonCount += 1;
         console.log(`  Learned new person ${person.id} (1 face)`);
       }
     } else {
@@ -95,10 +102,12 @@ class FaceClusteringCLI {
         if (matched) {
           store.addDescriptor(matched.personId, desc);
           groups.push({ personId: matched.personId, indices: [index] });
+          matchedFaceCount += 1;
           console.log(`  Matched face to person ${matched.personId} (distance ${matched.distance.toFixed(3)})`);
         } else {
           const person = store.createPerson([desc]);
           groups.push({ personId: person.id, indices: [index] });
+          newPersonCount += 1;
           console.log(`  Learned new person ${person.id} (1 face)`);
         }
       });
@@ -111,7 +120,14 @@ class FaceClusteringCLI {
 
     const shortcuts = await shortcutManager.createShortcuts(clustersForOutput, fileMapping);
     const uniquePersonFolders = new Set(groups.map(g => g.personId)).size;
-    console.log(`Created ${shortcuts.length} shortcut(s) in ${uniquePersonFolders} person folder(s)`);
+    console.log('');
+    console.log('--- Run summary ---');
+    console.log(`Images scanned new:     ${imageFiles.length - skipped}`);
+    console.log(`Faces matched to known: ${matchedFaceCount}`);
+    console.log(`New persons created:    ${newPersonCount}`);
+    console.log(`Shortcuts created:      ${shortcuts.length}`);
+    console.log(`Person folders updated: ${uniquePersonFolders}`);
+    console.log(`Known persons in store: ${store.people.length}`);
 
     await store.save();
     console.log(`Saved face data to ${store.storePath} (${store.people.length} person(s) total)`);
