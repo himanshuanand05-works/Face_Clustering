@@ -1,0 +1,37 @@
+{
+  "name": "face_clustering",
+  "version": "1.0.0",
+  "description": "A Node.js library that uses FaceNet to detect faces in images and cluster them into named folders using shortcuts without modifying originals.",
+  "main": "index.js",
+  "bin": {
+    "face-cluster": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node test/clusterer.test.js",
+    "test:e2e": "node test/e2e.test.js",
+    "test:smoke": "node test/smoke-detector.js",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "facenet",
+    "face-detection",
+    "face-clustering",
+    "image-processing",
+    "tensorflow",
+    "shortcuts"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
+    "density-clustering": "^1.3.0",
+    "sharp": "^0.35.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

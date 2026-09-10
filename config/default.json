@@ -1,0 +1,11 @@
+{
+  "inputDir": "./input",
+  "outputDir": "./output",
+  "modelsDir": "./models",
+  "clustering": {
+    "threshold": 0.6,
+    "minClusterSize": 2
+  },
+  "supportedFormats": [".jpg", ".jpeg", ".png", ".bmp", ".gif"],
+  "shortcutType": "link"
+}
