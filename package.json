@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node test/clusterer.test.js",
+    "test": "node test/clusterer.test.js && node test/faceStore.test.js",
     "test:e2e": "node test/e2e.test.js",
     "test:smoke": "node test/smoke-detector.js",
     "lint": "eslint ."

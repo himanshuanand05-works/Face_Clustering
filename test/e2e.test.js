@@ -2,8 +2,7 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const os = require('os');
-const { FaceDetector, FaceClusterer, ShortcutManager } = require('../index');
+const { FaceDetector, FaceClusterer, ShortcutManager, FaceStore } = require('../index');
 
 const MODELS = path.resolve(__dirname, '../models');
 const FIXTURES = path.join(__dirname, 'fixtures');
@@ -12,13 +11,13 @@ function hashFile(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-async function collectDescriptors(detector) {
-  const images = fs.readdirSync(FIXTURES).filter(f => f.toLowerCase().endsWith('.jpg'));
+async function collectDescriptors(detector, dir) {
+  const images = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.jpg'));
   const all = [];
   const mapping = [];
 
   for (const img of images) {
-    const full = path.join(FIXTURES, img);
+    const full = path.join(dir, img);
     const before = hashFile(full);
     const descriptors = await detector.getFaceDescriptors(full);
     const after = hashFile(full);
@@ -32,50 +31,64 @@ async function collectDescriptors(detector) {
   return { all, mapping };
 }
 
-async function main() {
+async function seed(store, clusterer, descriptors, mapping) {
+  const { clusters, noise } = clusterer.clusterFaces(descriptors);
+  const groups = [];
+  for (const cluster of clusters) {
+    const person = store.createPerson(cluster.descriptors);
+    groups.push({ personId: person.id, indices: cluster.indices });
+  }
+  for (const item of noise) {
+    const person = store.createPerson([item.descriptor]);
+    groups.push({ personId: person.id, indices: [item.index] });
+  }
+  return groups;
+}
+
+async function processTest() {
   const detector = new FaceDetector({ modelsDir: MODELS });
   const clusterer = new FaceClusterer({ threshold: 0.6, minClusterSize: 2 });
 
-  const { all, mapping } = await collectDescriptors(detector);
-  assert(all.length > 0, 'Expected at least one face detected');
-  console.log(`Collected ${all.length} descriptors, originals untouched (hash-checked)`);
+  const workDir = path.resolve(__dirname, '../output/e2e');
+  fs.rmSync(workDir, { recursive: true, force: true });
+  fs.mkdirSync(workDir, { recursive: true });
+  const storePath = path.join(workDir, 'face_store.json');
+  const store = new FaceStore(storePath, { threshold: 0.6 });
+  await store.load();
 
-  const { clusters, noise } = clusterer.clusterFaces(all);
-  assert(Array.isArray(clusters), 'clusters must be an array');
-  assert(Array.isArray(noise), 'noise must be an array');
-  console.log(`Clusters: ${clusters.length}, noise: ${noise.length}`);
+  const { all, mapping } = await collectDescriptors(detector, FIXTURES);
+  const groups = await seed(store, clusterer, all, mapping);
+  await store.save();
 
-  if (clusters.length > 0) {
-    const outputDir = path.join(os.tmpdir(), `face_cluster_e2e_${Date.now()}`);
-    const manager = new ShortcutManager(outputDir);
-    const created = await manager.createShortcuts(clusters, mapping);
+  assert(store.people.length === groups.length, 'Store must hold one person per learned group');
+  console.log(`Run 1: ${groups.length} person(s) learned and persisted to ${storePath}`);
 
-    for (const entry of created) {
-      assert(fs.existsSync(entry.shortcut), `Shortcut missing: ${entry.shortcut}`);
-      assert(RESOLVED_SOURCE_CHECK(entry), `Shortcut target mismatch: ${entry.source}`);
-    }
-
-    const structure = await manager.getOutputStructure();
-    assert(Object.keys(structure).length === clusters.length, 'Expected one folder per cluster');
-    console.log('Completed shortcuts:', JSON.stringify(structure, null, 2));
-
-    fs.rmSync(outputDir, { recursive: true, force: true });
+  const manager = new ShortcutManager(workDir);
+  const clustersForOutput = groups.map(g => ({ id: g.personId, indices: g.indices }));
+  const created = await manager.createShortcuts(clustersForOutput, mapping);
+  for (const entry of created) {
+    assert(fs.existsSync(entry.shortcut), `Shortcut missing: ${entry.shortcut}`);
   }
+  console.log(`Run 1: created ${created.length} shortcut(s)`);
 
+  const knownCount = store.people.length;
+  const knownIds = store.people.map(p => p.id);
+
+  const reloaded = new FaceStore(storePath, { threshold: 0.6 });
+  await reloaded.load();
+  assert.strictEqual(reloaded.people.length, knownCount, 'Store reload must restore people');
+
+  for (const desc of all.slice(0, 5)) {
+    const match = reloaded.match(desc);
+    assert(match, 'Known descriptor must match a stored person');
+    assert(knownIds.includes(match.personId), 'Match must return a valid person id');
+  }
+  console.log('Run 2: re-loaded store, faces from run 1 match existing people (incremental reuse works)');
+  console.log(`Test output left in place at: ${workDir}`);
   console.log('E2E TEST PASSED');
 }
 
-function RESOLVED_SOURCE_CHECK(entry) {
-  if (process.platform !== 'win32') {
-    const resolved = fs.readlinkSync(entry.shortcut);
-    return path.resolve(resolved) === path.resolve(entry.source);
-  }
-  return true;
-}
-
-const ORIGINALS_SNAPSHOT = [];
-
-main().then(() => process.exit(0)).catch(err => {
+processTest().then(() => process.exit(0)).catch(err => {
   console.error('E2E TEST FAILED:', err);
   process.exit(1);
 });

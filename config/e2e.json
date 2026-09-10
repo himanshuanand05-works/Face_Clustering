@@ -1,7 +1,8 @@
 {
   "inputDir": "../test/fixtures",
-  "outputDir": "../tmp-output",
+  "outputDir": "../output/e2e",
   "modelsDir": "../models",
+  "faceStoreFile": "../output/e2e/face_store.json",
   "clustering": {
     "threshold": 0.6,
     "minClusterSize": 2
