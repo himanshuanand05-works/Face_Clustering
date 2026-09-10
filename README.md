@@ -72,6 +72,12 @@ Face_Clustering/
 ## Installation
 
 ```bash
+npm install @himanshuanand05/face-clustering
+```
+
+Or locally, inside the cloned repo:
+
+```bash
 cd Face_Clustering
 npm install
 ```
@@ -87,7 +93,7 @@ When cloning fresh, the FaceNet weights are checked into `models/`. If they are 
 ### Library API
 
 ```js
-const { FaceDetector, FaceClusterer, ShortcutManager, FaceStore } = require('face_clustering');
+const { FaceDetector, FaceClusterer, ShortcutManager, FaceStore } = require('@himanshuanand05/face-clustering');
 
 const detector = new FaceDetector({ modelsDir: 'models' });
 const descriptors = await detector.getFaceDescriptors('./input/photo.jpg');
@@ -114,6 +120,8 @@ npm start
 # or point at another config:
 node src/cli.js config/e2e.json
 ```
+
+The CLI is a development convenience — the config file paths resolve relative to that file's location, so keep `modelsDir`/`outputDir`/`faceStoreFile` pointing at your own absolute folders when using it as a published package. For programmatic use, prefer the Library API above (all paths are passed as absolute and the default `config/` is not shipped in the published package).
 
 ## Configuration (`config/default.json`)
 

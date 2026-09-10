@@ -1,8 +1,17 @@
 {
-  "name": "face_clustering",
+  "name": "@himanshuanand05/face-clustering",
   "version": "1.0.0",
   "description": "A Node.js library that uses FaceNet to detect faces in images and cluster them into named folders using shortcuts without modifying originals.",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "lib/",
+    "src/",
+    "models/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "bin": {
     "face-cluster": "./src/cli.js"
   },
@@ -21,8 +30,11 @@
     "tensorflow",
     "shortcuts"
   ],
-  "author": "",
+  "author": "Himanshu Anand",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "commonjs",
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
